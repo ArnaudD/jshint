@@ -100,9 +100,7 @@ target.test = function () {
 
 target.build = function () {
 	var browserify = require("browserify");
-	var bundle = browserify({ debug: true });
-
-	bundle.addEntry("./src/stable/jshint.js");
+	var bundle = browserify(["./src/stable/jshint.js"]);
 
 	if (!test("-e", "./dist")) {
 		mkdir("./dist");
@@ -110,20 +108,23 @@ target.build = function () {
 
 	echo("Building into dist/...", "\n");
 
-	bundle.append("JSHINT = require('/src/stable/jshint.js').JSHINT;");
+	bundle.bundle({debug: true}, function (err, src) {
+		if (err) {
+			console.error("build error\n");
+			return;
+		}
 
-	[ "// " + pkg.version,
-		"var JSHINT;",
-		bundle.bundle()
-	].join("\n").to("./dist/jshint-" + pkg.version + ".js");
+		src =  "// " + pkg.version + "\nvar JSHINT;\n" + src +
+			   "\nJSHINT = require('/src/stable/jshint.js').JSHINT;";
 
-	cli.ok("Bundle");
+		src.to("./dist/jshint-" + pkg.version + ".js");
+		cli.ok("Bundle");
 
-	// Rhino
-	var rhino = cat("./dist/jshint-" + pkg.version + ".js", "./src/platforms/rhino.js");
-	rhino = "#!/usr/bin/env rhino\n\n" + rhino;
-	rhino.to("./dist/jshint-rhino-" + pkg.version + ".js");
-	exec("chmod +x dist/jshint-rhino-" + pkg.version + ".js");
-	cli.ok("Rhino");
-	echo("\n");
+		// Rhino
+		var rhino = "#!/usr/bin/env rhino\n\n" + src + cat("./src/platforms/rhino.js");
+		rhino.to("./dist/jshint-rhino-" + pkg.version + ".js");
+		exec("chmod +x dist/jshint-rhino-" + pkg.version + ".js");
+		cli.ok("Rhino");
+		echo("\n");
+	});
 };
